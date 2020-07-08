@@ -1,6 +1,7 @@
 @echo off
 @rem Script de Backup Alfresco
 @rem requisitos: 7zip e alfresco
+@rem para mudar a quantidade de dias alterar no arquivo lastday.vbs
 
 SET PGUSER=alfresco
 SET PGPASSWORD=sejalivre
@@ -8,25 +9,30 @@ SET PGHOST=localhost
 SET PGPORT=5432
 SET PGDATABASE=alfresco
 SET DESTDIR=E:\BackupAlfresco
+SET UNIDADEDEST=E:
 SET CONTENTSTORE=D:\alf_data\contentstore
+SET UNIDADEALFDATA=d:
 SET INDEX=D:\alf_data\solr4
 SET KEYSTORE=D:\alf_data\keystore
 SET ZIP7="C:\Program Files\7-Zip\7z.exe"
 SET ALFRESCO=C:\alfresco\
+SET UNIDADEALFRESCO=c:
 
 @title Iniciando backup
 
-FOR /F %%i IN ('cscript "%~dp0lastDay.vbs" //Nologo') do SET DATAREMOVE=%%i
+FOR /F %%i IN ('cscript "%~dp0lastday.vbs" //Nologo') do SET DATAREMOVE=%%i
 echo Backup a excluir: %DATAREMOVE%
 
 set "YYYY2=%DATAREMOVE:~6,4%" & set "MM2=%DATAREMOVE:~3,2%" & set "DD2=%DATAREMOVE:~0,2%"
 set "DIAREMOVE=%YYYY2%%MM2%%DD2%"
 
-e:
+%UNIDADEDEST%
 echo apagando pasta: %DESTDIR%\%DIAREMOVE%
+
 del /q %DESTDIR%\%DIAREMOVE%
 rmdir %DESTDIR%\%DIAREMOVE%
-c:
+%UNIDADEALFRESCO%
+
 
 @echo --------------------
 @echo Iniciando Backup do PostgreSQL
@@ -41,8 +47,7 @@ net stop "alfrescoTomcat"
 @echo formatando data...
 for /f "tokens=2 delims==" %%a in ('wmic OS Get localdatetime /value') do set "dt=%%a"
 set "YY=%dt:~2,2%" & set "YYYY=%dt:~0,4%" & set "MM=%dt:~4,2%" & set "DD=%dt:~6,2%"
-set "HH=%dt:~8,2%" & set "Min=%dt:~10,2%" & set "Sec=%dt:~12,2%"
-set "datestamp=%YYYY%%MM%%DD%" & set "timestamp=%HH%%Min%%Sec%"
+set "datestamp=%YYYY%%MM%%DD%"
 echo datestamp: "%datestamp%"
 
 mkdir %DESTDIR%\%datestamp%
@@ -56,17 +61,15 @@ pg_dump.exe --host %PGHOST% --port %PGPORT% --username %PGUSER% --format tar --f
 @echo Iniciando Backup do repositório
 @echo --------------------
 
-@d:
-@cd %KEYSTORE%
-@echo %KEYSTORE%
-
+%UNIDADEALFDATA%
 @cd %CONTENTSTORE%
 %ZIP7% a -tzip %DESTDIR%\%datestamp%\contentstore.zip * -r
 
+%UNIDADEALFDATA%
 @cd %INDEX%
 %ZIP7% a -tzip %DESTDIR%\%datestamp%\solr4.zip * -r
 
-@c:
+%UNIDADEALFRESCO%
 REM Backup do sistema a cada 3 dias ( rotacionando 3 em 3 o backup total )
 SET "GRAVASOFTWARE=FALSE"
 
@@ -117,12 +120,12 @@ IF "%DD%" EQU "01" (
 )
 
 IF "%GRAVASOFTWARE%" EQU "TRUE"  (
-    @c:
+    %UNIDADEALFRESCO%
     @echo Realizando backup do software alfresco...
     @cd %ALFRESCO%
     %ZIP7% a -tzip %DESTDIR%\%datestamp%\alfresco.zip * -r
    
-    @d:
+    %UNIDADEALFDATA%
     %ZIP7% a -tzip %DESTDIR%\%datestamp%\keystore.zip * -r
 	@echo %ZIP7%
 	@echo diretorio destino
@@ -131,7 +134,7 @@ IF "%GRAVASOFTWARE%" EQU "TRUE"  (
 
 @echo iniciando o servico do Tomcat...
 net start "alfrescoTomcat"
-@c:
+%UNIDADEALFRESCO%
 @cd C:\alfresco\scripts
 @echo --------------------
 @echo Backup Concluido
